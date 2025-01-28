@@ -4,12 +4,12 @@ function Get-CIPPAuthentication {
     param (
         $APIName = 'Get Keyvault Authentication'
     )
-    $Variables = @('ApplicationId', 'ApplicationSecret', 'TenantId', 'RefreshToken')
+    $Variables = @('ApplicationID', 'ApplicationSecret', 'TenantID', 'RefreshToken')
 
     try {
         if ($env:AzureWebJobsStorage -eq 'UseDevelopmentStorage=true') {
             $Table = Get-CIPPTable -tablename 'DevSecrets'
-            $Secret = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Secret' and RowKey eq 'Secret'"
+            $Secret = Get-AzDataTableEntity @Table -Filter "PartitionKey eq 'Secret' and RowKey eq 'Secret'"
             if (!$Secret) {
                 throw 'Development variables not set'
             }
@@ -20,9 +20,9 @@ function Get-CIPPAuthentication {
             }
         } else {
             Connect-AzAccount -Identity
-
+            $keyvaultname = ($ENV:WEBSITE_DEPLOYMENT_ID -split '-')[0]
             $Variables | ForEach-Object {
-                Set-Item -Path ENV:$_ -Value (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name $_ -AsPlainText -ErrorAction Stop) -Force
+                Set-Item -Path ENV:$_ -Value (Get-AzKeyVaultSecret -VaultName $keyvaultname -Name $_ -AsPlainText -ErrorAction Stop) -Force
             }
         }
         $ENV:SetFromProfile = $true
@@ -30,9 +30,7 @@ function Get-CIPPAuthentication {
 
         return $true
     } catch {
-        Write-LogMessage -message "Could not retrieve keys from Keyvault: $($_.Exception.Message)" -Sev 'CRITICAL' -API 'CIPP Authentication'
+        Write-LogMessage -message 'Could not retrieve keys from Keyvault' -Sev 'CRITICAL' -API 'CIPP Authentication' -LogData (Get-CippException -Exception $_)
         return $false
     }
 }
-
-
